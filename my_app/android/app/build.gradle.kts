@@ -2,7 +2,7 @@ import java.util.Properties
 import java.io.FileInputStream
 
 val keystoreProperties = Properties()
-val keystorePropertiesFile = rootProject.file("android/key.properties")
+val keystorePropertiesFile = rootProject.file("key.properties")
 if (keystorePropertiesFile.exists()) {
 	keystoreProperties.load(FileInputStream(keystorePropertiesFile))
 }
@@ -15,7 +15,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.my_app"
+    namespace = "com.pati.pati"
 	compileSdk = flutter.compileSdkVersion
 	ndkVersion = "27.0.12077973"
 
@@ -29,7 +29,7 @@ android {
 	}
 
     defaultConfig {
-        applicationId = "com.example.my_app"
+        applicationId = "com.pati.pati"
 		minSdk = 23
 		targetSdk = flutter.targetSdkVersion
 		versionCode = flutter.versionCode
@@ -52,6 +52,10 @@ android {
 			// Enable both minification and resource shrinking for optimal APK size
 			isMinifyEnabled = true
 			isShrinkResources = true
+            // Use the configured keystore for release builds if available
+            if (keystorePropertiesFile.exists()) {
+                signingConfig = signingConfigs.getByName("release")
+            }
 			proguardFiles(
 				getDefaultProguardFile("proguard-android-optimize.txt"),
 				"proguard-rules.pro"

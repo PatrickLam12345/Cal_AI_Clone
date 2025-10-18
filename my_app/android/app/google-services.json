@@ -14,11 +14,55 @@
       },
       "oauth_client": [
         {
-          "client_id": "380605215705-seimpaigf66ka8pvhtltpa6pom1ku66f.apps.googleusercontent.com",
+          "client_id": "380605215705-htt8b7qpfa8smiftc3ctcvqp45uvck9d.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDSkXA-ZNdcuxPUOqhDvuS2W0gvLeZ-DvM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "380605215705-8d134bjt2tttv8u17qctq1as617d6rh7.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "380605215705-6d4en3fbqhrugnpb1snm65hhbj1cks2e.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.pati.pati"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:380605215705:android:6f456b0452440bcc16dfc8",
+        "android_client_info": {
+          "package_name": "com.pati.pati"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "380605215705-nihsbg1j415pop574l2hok8kfr0i1jar.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
-            "package_name": "com.example.my_app",
-            "certificate_hash": "d0957f382dda0483c57720cdf96bc25f28eb38b1"
+            "package_name": "com.pati.pati",
+            "certificate_hash": "b54a536c2d41190824d812f9ad0b2f2e0c759e9d"
+          }
+        },
+        {
+          "client_id": "380605215705-rs28as71ae13dcu5hl7p24p17c3g1efd.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.pati.pati",
+            "certificate_hash": "b1e5719422a8f6eb0ce7f0cd2f401a16f50608ba"
           }
         },
         {
@@ -39,10 +83,10 @@
               "client_type": 3
             },
             {
-              "client_id": "380605215705-o91q8g3826upvugs77beqji7c4ggsdk8.apps.googleusercontent.com",
+              "client_id": "380605215705-6d4en3fbqhrugnpb1snm65hhbj1cks2e.apps.googleusercontent.com",
               "client_type": 2,
               "ios_info": {
-                "bundle_id": "com.example.myApp"
+                "bundle_id": "com.pati.pati"
               }
             }
           ]
