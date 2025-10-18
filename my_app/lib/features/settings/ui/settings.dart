@@ -67,6 +67,14 @@ class _SettingsPageState extends State<SettingsPage> {
     if (snap.exists) {
       final data = snap.data()!;
       _hydrateFromDoc(data);
+      // If no explicit macro overrides are stored, default to computed macros from goals
+      final hasOverrides = data.containsKey('calories_override') ||
+          data.containsKey('protein_g_override') ||
+          data.containsKey('carb_g_override') ||
+          data.containsKey('fat_g_override');
+      if (!hasOverrides) {
+        _applyDefaultsFromGoals();
+      }
     }
   }
 
@@ -110,6 +118,14 @@ class _SettingsPageState extends State<SettingsPage> {
                 trailing: const Icon(Icons.chevron_right),
                 onTap: _openMacrosDialog,
               ),
+              const SizedBox(height: 8),
+              ListTile(
+                leading: const Icon(Icons.brightness_6),
+                title: const Text('Appearance'),
+                subtitle: const Text('Light or Dark mode'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: _openThemeDialog,
+              ),
               const SizedBox(height: 24),
 
               // ===== Account section =====
@@ -120,6 +136,21 @@ class _SettingsPageState extends State<SettingsPage> {
                 title: const Text('Account'),
                 childrenPadding: const EdgeInsets.all(12),
                 children: [
+                  Builder(builder: (context) {
+                    final email = FirebaseAuth.instance.currentUser?.email;
+                    if (email == null || email.isEmpty) return const SizedBox.shrink();
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Signed in as'),
+                          Text(email, style: const TextStyle(fontWeight: FontWeight.w600)),
+                        ],
+                      ),
+                    );
+                  }),
+                  // Theme mode selector (Light / Dark / System)
                   FilledButton.tonal(
                     onPressed: () async {
                       await FirebaseAuth.instance.signOut();
@@ -207,6 +238,61 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   // ===================== DIALOGS =====================
+  Future<void> _openThemeDialog() async {
+    if (_docRef == null) return;
+    String current = 'light';
+    try {
+      final snap = await _docRef!.get();
+      current = (snap.data()?['theme'] as String?)?.toLowerCase() ?? 'light';
+      if (current != 'light' && current != 'dark') current = 'light';
+    } catch (_) {}
+
+    await showDialog<void>(
+      context: context,
+      builder: (context) {
+        String selected = current;
+        return StatefulBuilder(builder: (context, setLocal) {
+          return AlertDialog(
+            title: const Text('Appearance'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                RadioListTile<String>(
+                  title: const Text('Light'),
+                  value: 'light',
+                  groupValue: selected,
+                  onChanged: (v) async {
+                    final choice = v ?? 'light';
+                    setLocal(() => selected = choice);
+                    try {
+                      await _docRef!.set({'theme': choice, 'updated_at': FieldValue.serverTimestamp()}, SetOptions(merge: true));
+                    } catch (_) {}
+                    if (!mounted) return;
+                    Navigator.of(context).pop();
+                  },
+                ),
+                RadioListTile<String>(
+                  title: const Text('Dark'),
+                  value: 'dark',
+                  groupValue: selected,
+                  onChanged: (v) async {
+                    final choice = v ?? 'dark';
+                    setLocal(() => selected = choice);
+                    try {
+                      await _docRef!.set({'theme': choice, 'updated_at': FieldValue.serverTimestamp()}, SetOptions(merge: true));
+                    } catch (_) {}
+                    if (!mounted) return;
+                    Navigator.of(context).pop();
+                  },
+                ),
+              ],
+            ),
+            // No actions; tapping an option applies immediately. Dialog can be dismissed by tapping outside.
+          );
+        });
+      },
+    );
+  }
 
   Future<void> _openGoalsDialog() async {
     // Local state copies
@@ -219,6 +305,7 @@ class _SettingsPageState extends State<SettingsPage> {
     String goal = _goal; // 'lose' | 'maintain' | 'gain'
     double targetWeightKg = _targetWeightKg; // always kg internally
     double rateKgPerWeekMag = _rateKgPerWeek.abs(); // POSITIVE ONLY magnitude
+    const double _defaultRateKgPerWeek = 0.10; // smaller default when leaving maintain
     double proteinGPerKg = _proteinGPerKg;
     double fatPercent = _fatPercent;
 
@@ -264,6 +351,10 @@ class _SettingsPageState extends State<SettingsPage> {
       targetCtrl.text = kgToDisplay(targetWeightKg).toStringAsFixed(1);
       // also make sure goal reflects the new relationship (should already)
       _syncGoalFromTarget();
+      // If transitioning away from maintain and speed is zero, set a sensible default
+      if (goal != 'maintain' && rateKgPerWeekMag == 0.0) {
+        rateKgPerWeekMag = _defaultRateKgPerWeek;
+      }
       setLocal(() {}); // force rebuild for labels like speed text
     }
 
@@ -359,10 +450,10 @@ class _SettingsPageState extends State<SettingsPage> {
                           decoration:
                               const InputDecoration(labelText: 'Height (cm)'),
                           keyboardType: TextInputType.number,
-                          onChanged: (v) {
+                      onChanged: (v) {
                             final n = double.tryParse(v);
                             if (n != null)
-                              setLocal(() => heightCm = n.clamp(120, 250));
+                          setLocal(() => heightCm = n.clamp(120, 250));
                           },
                         )
                       else
@@ -389,7 +480,7 @@ class _SettingsPageState extends State<SettingsPage> {
                                 decoration: const InputDecoration(
                                     labelText: 'Height (in)'),
                                 keyboardType: TextInputType.number,
-                                onChanged: (v) {
+                      onChanged: (v) {
                                   final inch = double.tryParse(v) ?? 0;
                                   final ft = heightCm / 2.54 ~/ 12;
                                   setLocal(
@@ -409,7 +500,7 @@ class _SettingsPageState extends State<SettingsPage> {
                               'Weight (${units == 'metric' ? 'kg' : 'lb'})',
                         ),
                         keyboardType: TextInputType.number,
-                        onChanged: (v) {
+                      onChanged: (v) {
                           final n = double.tryParse(v);
                           if (n != null) {
                             weightKg = displayToKg(n);
@@ -458,7 +549,32 @@ class _SettingsPageState extends State<SettingsPage> {
                         onChanged: (v) {
                           if (v == null || v == goal) return;
                           goal = v;
-                          _flipGoalPreserveDiffAndRefreshControllers(setLocal);
+
+                          // If switching to maintain: align target to current and set speed to 0 visually
+                          if (goal == 'maintain') {
+                            targetWeightKg = weightKg;
+                            rateKgPerWeekMag = 0.0;
+                          } else {
+                            // Ensure target differs by at least 1 kg or 1 lb depending on units if equal to current
+                            final deltaKg = units == 'metric' ? 1.0 : (1.0 / 2.2046226218);
+                            if (goal == 'gain') {
+                              if ((targetWeightKg - weightKg).abs() < 1e-6 || targetWeightKg <= weightKg) {
+                                targetWeightKg = weightKg + deltaKg;
+                              }
+                            } else if (goal == 'lose') {
+                              if ((targetWeightKg - weightKg).abs() < 1e-6 || targetWeightKg >= weightKg) {
+                                targetWeightKg = weightKg - deltaKg;
+                              }
+                            }
+                            // If leaving maintain and speed is zero, set a small default so the slider reflects change
+                            if (rateKgPerWeekMag == 0.0) {
+                              rateKgPerWeekMag = _defaultRateKgPerWeek;
+                            }
+                          }
+
+                          // Refresh target field and UI labels immediately
+                          targetCtrl.text = kgToDisplay(targetWeightKg).toStringAsFixed(1);
+                          setLocal(() {});
                         },
                       ),
                       const SizedBox(height: 12),
@@ -471,11 +587,15 @@ class _SettingsPageState extends State<SettingsPage> {
                               'Target weight (${units == 'metric' ? 'kg' : 'lb'})',
                         ),
                         keyboardType: TextInputType.number,
-                        onChanged: (v) {
+                      onChanged: (v) {
                           final n = double.tryParse(v);
                           if (n != null) {
                             targetWeightKg = displayToKg(n);
                             _syncGoalFromTarget(); // goal adjusts to match new relationship
+                          if (goal != 'maintain' && rateKgPerWeekMag == 0.0) {
+                            // Set a reasonable default if previously zero
+                            rateKgPerWeekMag = _defaultRateKgPerWeek;
+                          }
                             setLocal(() {}); // refresh goal label
                           }
                         },
@@ -590,6 +710,15 @@ class _SettingsPageState extends State<SettingsPage> {
             carbG = allowedCarb.clamp(0, _maxCarbG).toDouble();
           }
 
+          void revertToDefaults() {
+            final defaults = _computeDefaultMacrosFromState();
+            calorieGoal = defaults['cal']!;
+            proteinG = defaults['p']!;
+            carbG = defaults['c']!;
+            fatG = defaults['f']!;
+            setLocal(() {});
+          }
+
           return AlertDialog(
             title: const Text('Adjust Macros'),
             content: SizedBox(
@@ -701,6 +830,10 @@ class _SettingsPageState extends State<SettingsPage> {
                 onPressed: () => Navigator.of(context).pop(),
                 child: const Text('Cancel'),
               ),
+            TextButton(
+              onPressed: revertToDefaults,
+              child: const Text('Revert to defaults'),
+            ),
               FilledButton(
                 onPressed: () async {
                   setState(() {
@@ -776,6 +909,49 @@ class _SettingsPageState extends State<SettingsPage> {
     _proteinGoalG = proteinG;
     _fatGoalG = fatG;
     _carbGoalG = carbG;
+  }
+
+  // Compute default macros from the current goal inputs without mutating state
+  Map<String, double> _computeDefaultMacrosFromState() {
+    final bmr = _sex == 'female'
+        ? (10 * _weightKg + 6.25 * _heightCm - 5 * _age - 161)
+        : (10 * _weightKg + 6.25 * _heightCm - 5 * _age + 5);
+
+    final activityFactor = switch (_activity) {
+      'sedentary' => 1.2,
+      'light' => 1.375,
+      'moderate' => 1.55,
+      'active' => 1.725,
+      'veryactive' => 1.9,
+      _ => 1.55,
+    };
+
+    final tdee = bmr * activityFactor;
+    final kcalDelta = (_rateKgPerWeek * 7700) / 7.0;
+    double targetCal = (tdee + kcalDelta).clamp(_minCalories, _maxCalories).toDouble();
+
+    final proteinG = (_proteinGPerKg * _weightKg).clamp(50, 400).toDouble();
+    final fatCal = (targetCal * (_fatPercent / 100.0));
+    final fatG = (fatCal / 9.0).clamp(20, 250).toDouble();
+    final remainingCal =
+        (targetCal - (proteinG * 4 + fatG * 9)).clamp(0, 99999).toDouble();
+    final carbG = (remainingCal / 4.0).clamp(0, _maxCarbG).toDouble();
+
+    return {
+      'cal': targetCal,
+      'p': proteinG,
+      'c': carbG,
+      'f': fatG,
+    };
+  }
+
+  // Apply default macros to state based on current goals
+  void _applyDefaultsFromGoals() {
+    final d = _computeDefaultMacrosFromState();
+    _calorieGoal = d['cal']!;
+    _proteinGoalG = d['p']!;
+    _carbGoalG = d['c']!;
+    _fatGoalG = d['f']!;
   }
 
   void _hydrateFromDoc(Map<String, dynamic> data) {

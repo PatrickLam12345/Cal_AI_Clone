@@ -8,12 +8,19 @@ const String _lanIp = '192.168.0.123';
 
 // Your dev machine's LAN IP
 const int _port = 3000;
-const String _prodUrl = 'https://api.myapp.com'; // Your live API endpoint
+const String _prodUrl = 'https://us-central1-cal-ai-clone-e57ea.cloudfunctions.net/api'; // Your live API endpoint
+
+// Optional build-time overrides
+const String _apiBaseOverride = String.fromEnvironment('API_BASE', defaultValue: '');
+const bool _forceProd = bool.fromEnvironment('FORCE_PROD', defaultValue: false);
 
 /// Get the correct API base URL depending on environment
 Future<String> apiBaseUrl() async {
-  // Release mode → always production
-  if (kReleaseMode) {
+  // Highest priority: explicit override via --dart-define
+  if (_apiBaseOverride.isNotEmpty) return _apiBaseOverride;
+
+  // Release mode or forced production → production URL
+  if (kReleaseMode || _forceProd) {
     return _prodUrl;
   }
 

@@ -39,8 +39,6 @@ class AnalyticsPage extends StatelessWidget {
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              _buildWeightProgressSection(analytics, context),
-              const SizedBox(height: 16),
               _buildBMISection(analytics, context),
               const SizedBox(height: 24),
               const Divider(thickness: 2),
@@ -194,10 +192,37 @@ class AnalyticsPage extends StatelessWidget {
       final uid = FirebaseAuth.instance.currentUser?.uid;
       if (uid == null) return;
       
+      // Determine new goal from target vs current
+      final diff = targetWeightKg - currentWeightKg;
+      String newGoal;
+      if (diff.abs() < 1e-6) {
+        newGoal = 'maintain';
+      } else if (diff > 0) {
+        newGoal = 'gain';
+      } else {
+        newGoal = 'lose';
+      }
+
+      // Fetch existing rate to determine defaulting behavior
+      final docRef = FirebaseFirestore.instance.collection('users').doc(uid);
+      final snap = await docRef.get();
+      final data = snap.data() ?? {};
+      final currentRate = (data['rate_kg_per_week'] as num?)?.toDouble() ?? 0.0;
+
+      // If maintain, force 0 rate; otherwise if rate is 0, set a small default
+      double newRate = currentRate;
+      if (newGoal == 'maintain') {
+        newRate = 0.0;
+      } else if (currentRate == 0.0) {
+        newRate = 0.10; // kg/week
+      }
+
       // Update in Firestore
-      await FirebaseFirestore.instance.collection('users').doc(uid).update({
+      await docRef.update({
         'weight_kg': currentWeightKg,
         'target_weight_kg': targetWeightKg,
+        'goal': newGoal,
+        'rate_kg_per_week': newRate,
       });
       
       Navigator.of(context).pop();
@@ -222,6 +247,11 @@ class AnalyticsPage extends StatelessWidget {
 
   Widget _buildBMISection(_AnalyticsData analytics, BuildContext context) {
     final theme = Theme.of(context);
+    final isImperial = analytics.units == 'imperial';
+    final currentWeight = isImperial ? analytics.currentWeightKg * 2.2046226218 : analytics.currentWeightKg;
+    final targetWeight = isImperial ? analytics.targetWeightKg * 2.2046226218 : analytics.targetWeightKg;
+    final weightUnit = isImperial ? 'lbs' : 'kg';
+    final targetBmiColor = _bmiColorFor(analytics.targetBMI);
     
     return Card(
       child: Padding(
@@ -229,49 +259,84 @@ class AnalyticsPage extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('BMI Analysis', style: theme.textTheme.titleLarge),
-            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('BMI Analysis', style: theme.textTheme.titleLarge),
+                TextButton.icon(
+                  onPressed: () => _showWeightAdjustDialog(context, analytics),
+                  icon: const Icon(Icons.edit, size: 16),
+                  label: const Text('Adjust'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            // Current and Target Weight just below the header
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Current', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                    Text('${currentWeight.toStringAsFixed(1)} $weightUnit',
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text('Target', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                    Text('${targetWeight.toStringAsFixed(1)} $weightUnit',
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            // Current BMI and category on one row
             Row(
               children: [
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Current BMI', style: TextStyle(fontSize: 14, color: Colors.grey[600])),
-                      const SizedBox(height: 4),
-                      Text(
-                        analytics.currentBMI.toStringAsFixed(1),
-                        style: TextStyle(
-                          fontSize: 32,
-                          fontWeight: FontWeight.bold,
-                          color: analytics.bmiColor,
-                        ),
-                      ),
-                    ],
+                  child: Text(
+                    'Current BMI ${analytics.currentBMI.toStringAsFixed(1)}',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: analytics.bmiColor),
                   ),
                 ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: analytics.bmiColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: analytics.bmiColor),
+                  ),
+                  child: Text(
+                    analytics.bmiCategory,
+                    style: TextStyle(color: analytics.bmiColor, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            // Target BMI and category on one row
+            Row(
+              children: [
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Category', style: TextStyle(fontSize: 14, color: Colors.grey[600])),
-                      const SizedBox(height: 4),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: analytics.bmiColor.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: analytics.bmiColor),
-                        ),
-                        child: Text(
-                          analytics.bmiCategory,
-                          style: TextStyle(
-                            color: analytics.bmiColor,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ],
+                  child: Text(
+                    'Target BMI ${analytics.targetBMI.toStringAsFixed(1)}',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: targetBmiColor),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: targetBmiColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: targetBmiColor),
+                  ),
+                  child: Text(
+                    _bmiCategoryFor(analytics.targetBMI),
+                    style: TextStyle(color: targetBmiColor, fontWeight: FontWeight.w600),
                   ),
                 ),
               ],
@@ -292,83 +357,120 @@ class AnalyticsPage extends StatelessWidget {
       {'min': 30, 'max': 40, 'label': 'Obese', 'color': Colors.red},
     ];
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('BMI Scale', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-        const SizedBox(height: 8),
-        Container(
-          height: 24,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            gradient: const LinearGradient(
-              colors: [Colors.blue, Colors.green, Colors.orange, Colors.red],
-              stops: [0.0, 0.25, 0.5, 1.0],
+    return LayoutBuilder(builder: (context, constraints) {
+      final barWidth = constraints.maxWidth;
+      double posPx(double bmi) {
+        final percent = _getBMIPosition(bmi) / 100.0;
+        return (percent * barWidth).clamp(0, barWidth);
+      }
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('BMI Scale', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 8),
+          Container(
+            height: 24,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              gradient: const LinearGradient(
+                colors: [Colors.blue, Colors.green, Colors.orange, Colors.red],
+                stops: [0.0, 0.25, 0.5, 1.0],
+              ),
             ),
-          ),
-          child: Stack(
-            children: [
-              // BMI range labels
-              Positioned(
-                left: 8,
-                top: 2,
-                child: Text('18.5', style: TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold)),
-              ),
-              Positioned(
-                left: MediaQuery.of(context).size.width * 0.8 * 0.25 - 8,
-                top: 2,
-                child: Text('25', style: TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold)),
-              ),
-              Positioned(
-                left: MediaQuery.of(context).size.width * 0.8 * 0.5 - 8,
-                top: 2,
-                child: Text('30', style: TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold)),
-              ),
-              // Current BMI indicator
-              Positioned(
-                left: _getBMIPosition(analytics.currentBMI) - 6,
-                top: 0,
-                child: Container(
-                  width: 12,
-                  height: 24,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: Colors.black, width: 2),
-                  ),
+            child: Stack(
+              children: [
+                // BMI range labels positioned relative to bar width
+                Positioned(
+                  left: posPx(18.5) - 8,
+                  top: 2,
+                  child: const Text('18.5', style: TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold)),
                 ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 8),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: bmiRanges.map((range) {
-            return Expanded(
-              child: Column(
-                children: [
-                  Container(
-                    width: 8,
-                    height: 8,
+                Positioned(
+                  left: posPx(25) - 8,
+                  top: 2,
+                  child: const Text('25', style: TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
+                Positioned(
+                  left: posPx(30) - 8,
+                  top: 2,
+                  child: const Text('30', style: TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
+                // Current BMI indicator
+                Positioned(
+                  left: posPx(analytics.currentBMI) - 6,
+                  top: 0,
+                  child: Container(
+                    width: 12,
+                    height: 24,
                     decoration: BoxDecoration(
-                      color: range['color'] as Color,
-                      shape: BoxShape.circle,
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: Colors.black, width: 2),
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    range['label'] as String,
-                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.w500),
-                    textAlign: TextAlign.center,
+                ),
+                // Target BMI indicator
+                Positioned(
+                  left: posPx(analytics.targetBMI) - 6,
+                  top: 0,
+                  child: Container(
+                    width: 12,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      color: _bmiColorFor(analytics.targetBMI),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: Colors.white, width: 2),
+                    ),
                   ),
-                ],
-              ),
-            );
-          }).toList(),
-        ),
-      ],
-    );
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: bmiRanges.map((range) {
+              return Expanded(
+                child: Column(
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: range['color'] as Color,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      range['label'] as String,
+                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w500),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      );
+    });
+  }
+
+  // Helpers to map BMI to category/color (shared for current/target)
+  String _bmiCategoryFor(double bmi) {
+    if (bmi < 18.5) return 'Underweight';
+    if (bmi < 25) return 'Healthy';
+    if (bmi < 30) return 'Overweight';
+    return 'Obese';
+  }
+
+  Color _bmiColorFor(double bmi) {
+    if (bmi < 18.5) return Colors.blue;
+    if (bmi < 25) return Colors.green;
+    if (bmi < 30) return Colors.orange;
+    return Colors.red;
   }
 
   double _getBMIPosition(double bmi) {
@@ -425,12 +527,14 @@ class _AnalyticsData {
     final String goal = (data['goal'] as String? ?? 'maintain').toLowerCase();
     final String activity = (data['activity'] as String? ?? 'moderate').toLowerCase();
     
-    // Calculate target weight based on goal
-    double targetWeightKg = currentWeightKg;
-    if (goal == 'lose') {
-      targetWeightKg = currentWeightKg * 0.9; // 10% weight loss target
-    } else if (goal == 'gain') {
-      targetWeightKg = currentWeightKg * 1.1; // 10% weight gain target
+    // Target weight: prefer stored value; fallback to simple 10% rule
+    double targetWeightKg = (data['target_weight_kg'] as num?)?.toDouble() ?? currentWeightKg;
+    if (data['target_weight_kg'] == null) {
+      if (goal == 'lose') {
+        targetWeightKg = currentWeightKg * 0.9; // 10% weight loss target
+      } else if (goal == 'gain') {
+        targetWeightKg = currentWeightKg * 1.1; // 10% weight gain target
+      }
     }
 
     // Calculate BMI
@@ -440,7 +544,7 @@ class _AnalyticsData {
     // Weight difference
     final double weightDifferenceKg = targetWeightKg - currentWeightKg;
     final String weightDifferenceText = weightDifferenceKg >= 0 
-        ? '${weightDifferenceKg >= 0 ? 'Gain' : 'Lose'} needed'
+        ? '${weightDifferenceKg.abs().toStringAsFixed(1)} kg to gain'
         : '${weightDifferenceKg.abs().toStringAsFixed(1)} kg to lose';
 
     // Progress calculations

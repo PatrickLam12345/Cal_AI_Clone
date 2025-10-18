@@ -186,7 +186,11 @@ class _SignupFlowPageState extends State<SignupFlowPage> {
               onPressed: () async {
                 try {
                   final gsi = GoogleSignIn.instance;
-                  await gsi.initialize();
+                  // Pass Web client ID so Credential Manager returns an idToken
+                  await gsi.initialize(
+                    serverClientId:
+                        '380605215705-htt8b7qpfa8smiftc3ctcvqp45uvck9d.apps.googleusercontent.com',
+                  );
                   final account = await gsi.authenticate();
                   final auth = await account.authentication;
                   if (auth.idToken == null) {
@@ -194,9 +198,27 @@ class _SignupFlowPageState extends State<SignupFlowPage> {
                   }
                   final cred =
                       GoogleAuthProvider.credential(idToken: auth.idToken);
-                  await FirebaseAuth.instance.signInWithCredential(cred);
+                  final userCred = await FirebaseAuth.instance.signInWithCredential(cred);
 
                   if (!mounted) return;
+                  final uid = userCred.user?.uid;
+                  if (uid != null) {
+                    final doc = await FirebaseFirestore.instance
+                        .collection('users')
+                        .doc(uid)
+                        .get();
+                    if (doc.exists) {
+                      // Returning user: go straight to app
+                      if (!mounted) return;
+                      Navigator.of(context).pushAndRemoveUntil(
+                        MaterialPageRoute(builder: (context) => const MainNavPage()),
+                        (route) => false,
+                      );
+                      return;
+                    }
+                  }
+
+                  // New user: proceed to profile step
                   _pageController.animateToPage(
                     1,
                     duration: const Duration(milliseconds: 300),
@@ -234,6 +256,7 @@ class _SignupFlowPageState extends State<SignupFlowPage> {
     String goal = _goalToString(_goal);
     double targetWeightKg = _targetWeightKg;
     double rateKgPerWeekMag = _rateKgPerWeek.abs(); // POSITIVE magnitude
+    const double _defaultRateKgPerWeek = 0.10; // smaller default when leaving maintain
 
     // Unit helpers (identical to Settings)
     double kgToDisplay(double kg) => units == 'metric' ? kg : kg * 2.2046226218;
@@ -259,6 +282,9 @@ class _SignupFlowPageState extends State<SignupFlowPage> {
       } else {
         goal = 'lose';
       }
+      if (goal != 'maintain' && rateKgPerWeekMag == 0.0) {
+        rateKgPerWeekMag = _defaultRateKgPerWeek;
+      }
     }
 
     // Flip goal and preserve absolute difference (and refresh controllers)
@@ -274,6 +300,9 @@ class _SignupFlowPageState extends State<SignupFlowPage> {
       }
       targetCtrl.text = kgToDisplay(targetWeightKg).toStringAsFixed(1);
       syncGoalFromTarget();
+      if (goal != 'maintain' && rateKgPerWeekMag == 0.0) {
+        rateKgPerWeekMag = _defaultRateKgPerWeek;
+      }
       setLocal(() {});
     }
 

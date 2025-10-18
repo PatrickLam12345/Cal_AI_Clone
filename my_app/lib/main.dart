@@ -22,13 +22,49 @@ void main() async {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
+  // Stream of current user's preferred ThemeMode; defaults to system when signed out
+  Stream<ThemeMode> _themeModeStream() {
+    // Emit system while waiting
+    return FirebaseAuth.instance.authStateChanges().asyncExpand((user) {
+      if (user == null) {
+        return Stream<ThemeMode>.value(ThemeMode.system);
+      }
+      final docRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
+      return docRef.snapshots().map((snap) {
+        final themeStr = (snap.data()?['theme'] as String?)?.toLowerCase();
+        switch (themeStr) {
+          case 'light':
+            return ThemeMode.light;
+          case 'dark':
+            return ThemeMode.dark;
+          default:
+            return ThemeMode.system;
+        }
+      });
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Pati',
-      theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple)),
-      home: const AuthGate(),
+    return StreamBuilder<ThemeMode>(
+      stream: _themeModeStream(),
+      initialData: ThemeMode.system,
+      builder: (context, themeSnap) {
+        final mode = themeSnap.data ?? ThemeMode.system;
+        return MaterialApp(
+          title: 'Pati',
+          themeMode: mode,
+          theme: ThemeData(
+            colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple, brightness: Brightness.light),
+            useMaterial3: true,
+          ),
+          darkTheme: ThemeData(
+            colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple, brightness: Brightness.dark),
+            useMaterial3: true,
+          ),
+          home: const AuthGate(),
+        );
+      },
     );
   }
 }

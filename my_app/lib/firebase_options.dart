@@ -56,6 +56,8 @@ class DefaultFirebaseOptions {
     messagingSenderId: '380605215705',
     projectId: 'cal-ai-clone-e57ea',
     storageBucket: 'cal-ai-clone-e57ea.firebasestorage.app',
+    // NOTE: Update Android package to match applicationId
+    // This file is generated; prefer re-running FlutterFire CLI to regenerate
   );
 
   static const FirebaseOptions ios = FirebaseOptions(

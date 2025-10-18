@@ -212,7 +212,12 @@ class _FoodDatabasePageState extends State<FoodDatabasePage> {
                             showModalBottomSheet(
                               context: context,
                               isScrollControlled: true,
-                              builder: (_) => FoodDetailSheet(fdcId: idInt),
+                              builder: (_) => FoodDetailSheet(
+                                fdcId: idInt,
+                                fallbackName: name,
+                                fallbackCalories: cals,
+                                fallbackUnit: unitText,
+                              ),
                             );
                           } else {
                             ScaffoldMessenger.of(context).showSnackBar(

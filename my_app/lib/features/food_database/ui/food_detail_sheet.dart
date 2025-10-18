@@ -5,7 +5,11 @@ import '../../analytics/data/analytics_service.dart';
 
 class FoodDetailSheet extends StatefulWidget {
   final int fdcId;
-  const FoodDetailSheet({super.key, required this.fdcId});
+  // Optional compact fallback from search list (used if detail fails)
+  final String? fallbackName;
+  final double? fallbackCalories; // per fallbackUnit
+  final String? fallbackUnit; // e.g., "100 g" or "114 g" or "serving"
+  const FoodDetailSheet({super.key, required this.fdcId, this.fallbackName, this.fallbackCalories, this.fallbackUnit});
 
   @override
   State<FoodDetailSheet> createState() => _FoodDetailSheetState();
@@ -46,8 +50,37 @@ class _FoodDetailSheetState extends State<FoodDetailSheet> {
         _baseLabel = inferred.baseLabel;
       });
     } catch (e) {
-      if (!mounted) return;
-      setState(() => _error = '$e');
+      // Fallback: synthesize minimal detail from compact list data
+      final name = widget.fallbackName?.trim();
+      final kcal = widget.fallbackCalories;
+      if (name != null && name.isNotEmpty && kcal != null) {
+        // Parse grams from unit like "100 g" or default to 100
+        final unit = (widget.fallbackUnit ?? '').toLowerCase();
+        double baseG = 100.0;
+        final match = RegExp(r"(\d+(?:\.\d+)?)\s*g").firstMatch(unit);
+        if (match != null) {
+          final gStr = match.group(1);
+          final g = double.tryParse(gStr ?? '');
+          if (g != null && g > 0) baseG = g;
+        }
+        if (!mounted) return;
+        setState(() {
+          _detail = {
+            'description': name,
+            'dataType': 'foundation',
+          };
+          _nutrients = [
+            {'name': 'Energy', 'value': kcal, 'unit': 'kcal'},
+            // macros unknown in fallback; user can still adjust grams and add
+          ];
+          _baseGrams = baseG;
+          _grams = baseG;
+          _baseLabel = '${baseG.toStringAsFixed(0)} g';
+        });
+      } else {
+        if (!mounted) return;
+        setState(() => _error = '$e');
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -218,7 +251,7 @@ class _FoodDetailSheetState extends State<FoodDetailSheet> {
               const SizedBox(height: 6),
 
               _MacroRow(
-                label: energyInfo.computed ? 'Calories (computed)' : 'Calories',
+                label: 'Calories',
                 value: _scale(energyInfo.kcal),
                 unit: 'kcal',
                 precision: 0,
@@ -291,7 +324,10 @@ class _FoodDetailSheetState extends State<FoodDetailSheet> {
   _BaseInference _inferBaseFromDetail(Map<String, dynamic> d) {
     final dataType = (d['dataType'] ?? '').toString().toLowerCase();
 
-    // 1) Serving explicitly in grams
+    // Non-branded (Foundation/SR) → force 100 g so list and detail match
+    if (dataType != 'branded') return const _BaseInference(100.0, '100 g');
+
+    // Branded: prefer explicit gram serving
     final servingSize = d['servingSize'];
     final servingUnit = (d['servingSizeUnit'] ?? '').toString().toLowerCase();
     if (servingSize is num && servingSize > 0 && servingUnit == 'g') {
@@ -299,7 +335,7 @@ class _FoodDetailSheetState extends State<FoodDetailSheet> {
       return _BaseInference(g, '${_fmtNum(g)} g');
     }
 
-    // 2) First foodPortions gramWeight
+    // Branded: fallback to first foodPortions gramWeight
     final fps = d['foodPortions'];
     if (fps is List && fps.isNotEmpty) {
       final first = fps.first;
@@ -311,10 +347,7 @@ class _FoodDetailSheetState extends State<FoodDetailSheet> {
       }
     }
 
-    // 3) Non-branded → assume per 100 g
-    if (dataType != 'branded') return const _BaseInference(100.0, '100 g');
-
-    // 4) Fallback
+    // Final fallback
     return const _BaseInference(100.0, '100 g');
   }
 
