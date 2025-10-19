@@ -19,7 +19,7 @@
         android:icon="@mipmap/ic_launcher">
 
         <activity
-            android:name="com.example.pati.MainActivity"
+            android:name="com.pati.pati.MainActivity"
             android:exported="true"
             android:launchMode="singleTop"
             android:taskAffinity=""
