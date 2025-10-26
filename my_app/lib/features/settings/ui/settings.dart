@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import '../../auth/ui/sign_in_page.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -155,6 +156,13 @@ class _SettingsPageState extends State<SettingsPage> {
                     onPressed: () async {
                       await FirebaseAuth.instance.signOut();
                       if (!mounted) return;
+                      
+                      // Navigate to signup page and clear all routes
+                      Navigator.of(context).pushAndRemoveUntil(
+                        MaterialPageRoute(builder: (context) => const SignupFlowPage()),
+                        (route) => false,
+                      );
+                      
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text('Signed out')),
                       );
@@ -192,19 +200,30 @@ class _SettingsPageState extends State<SettingsPage> {
                       );
                       if (confirmed != true) return;
 
+                      bool deletionSucceeded = false;
                       try {
                         final user = FirebaseAuth.instance.currentUser!;
                         final uid = user.uid;
-                        await _docRef!.delete();
-                        final entries = await FirebaseFirestore.instance
-                            .collection('diary_entries')
-                            .where('uid', isEqualTo: uid)
-                            .limit(200)
-                            .get();
-                        for (final d in entries.docs) {
-                          await d.reference.delete();
+                        
+                        // Try to delete Firestore data, but don't fail if it errors
+                        try {
+                          await _docRef!.delete();
+                          final entries = await FirebaseFirestore.instance
+                              .collection('diary_entries')
+                              .where('uid', isEqualTo: uid)
+                              .limit(200)
+                              .get();
+                          for (final d in entries.docs) {
+                            await d.reference.delete();
+                          }
+                        } catch (firestoreError) {
+                          // Log but continue with user deletion
+                          print('Firestore deletion error (continuing): $firestoreError');
                         }
+                        
+                        // Delete the Firebase Auth user
                         await user.delete();
+                        deletionSucceeded = true;
                       } on FirebaseAuthException catch (e) {
                         if (e.code == 'requires-recent-login') {
                           if (!mounted) return;
@@ -216,15 +235,35 @@ class _SettingsPageState extends State<SettingsPage> {
                           );
                           return;
                         }
-                        rethrow;
-                      } finally {
-                        await FirebaseAuth.instance.signOut();
+                        // For other Firebase Auth errors, show message
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Error deleting account: ${e.message}')),
+                        );
+                        return;
+                      } catch (e) {
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Error deleting account: $e')),
+                        );
+                        return;
                       }
 
-                      if (!mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Account deleted')),
-                      );
+                      // Only navigate if deletion succeeded
+                      if (deletionSucceeded) {
+                        await FirebaseAuth.instance.signOut();
+                        if (!mounted) return;
+                        
+                        // Navigate to signup page and clear all routes
+                        Navigator.of(context).pushAndRemoveUntil(
+                          MaterialPageRoute(builder: (context) => const SignupFlowPage()),
+                          (route) => false,
+                        );
+                        
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Account deleted')),
+                        );
+                      }
                     },
                     child: const Text('Delete account'),
                   ),
@@ -538,13 +577,21 @@ class _SettingsPageState extends State<SettingsPage> {
                       DropdownButtonFormField<String>(
                         value: goal,
                         decoration: const InputDecoration(labelText: 'Goal'),
-                        items: const [
+                        items: [
                           DropdownMenuItem(
-                              value: 'lose', child: Text('Lose weight')),
+                            value: 'lose',
+                            child: Text(goal == 'lose' 
+                                ? 'Lose ${kgToDisplay(weightKg - targetWeightKg).toStringAsFixed(1)} ${units == 'metric' ? 'kg' : 'lb'}'
+                                : 'Lose weight'),
+                          ),
+                          const DropdownMenuItem(
+                              value: 'maintain', child: Text('Maintain weight')),
                           DropdownMenuItem(
-                              value: 'maintain', child: Text('Maintain')),
-                          DropdownMenuItem(
-                              value: 'gain', child: Text('Gain weight')),
+                            value: 'gain',
+                            child: Text(goal == 'gain'
+                                ? 'Gain ${kgToDisplay(targetWeightKg - weightKg).toStringAsFixed(1)} ${units == 'metric' ? 'kg' : 'lb'}'
+                                : 'Gain weight'),
+                          ),
                         ],
                         onChanged: (v) {
                           if (v == null || v == goal) return;
@@ -555,16 +602,14 @@ class _SettingsPageState extends State<SettingsPage> {
                             targetWeightKg = weightKg;
                             rateKgPerWeekMag = 0.0;
                           } else {
-                            // Ensure target differs by at least 1 kg or 1 lb depending on units if equal to current
-                            final deltaKg = units == 'metric' ? 1.0 : (1.0 / 2.2046226218);
+                            // Ensure target differs by at least 1 kg if equal to current
+                            final minDiff = 1.0; // Minimum 1 kg difference
+                            final diffAbs = (targetWeightKg - weightKg).abs();
+                            
                             if (goal == 'gain') {
-                              if ((targetWeightKg - weightKg).abs() < 1e-6 || targetWeightKg <= weightKg) {
-                                targetWeightKg = weightKg + deltaKg;
-                              }
+                              targetWeightKg = weightKg + (diffAbs < minDiff ? minDiff : diffAbs);
                             } else if (goal == 'lose') {
-                              if ((targetWeightKg - weightKg).abs() < 1e-6 || targetWeightKg >= weightKg) {
-                                targetWeightKg = weightKg - deltaKg;
-                              }
+                              targetWeightKg = weightKg - (diffAbs < minDiff ? minDiff : diffAbs);
                             }
                             // If leaving maintain and speed is zero, set a small default so the slider reflects change
                             if (rateKgPerWeekMag == 0.0) {

@@ -162,6 +162,19 @@ class _SignupFlowPageState extends State<SignupFlowPage> {
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // App Logo
+          Center(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(24),
+              child: Image.asset(
+                'assets/icon/app_icon.png',
+                width: 120,
+                height: 120,
+                fit: BoxFit.cover,
+              ),
+            ),
+          ),
+          const SizedBox(height: 32),
           const Text(
             'Welcome to Pati',
             style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
@@ -291,10 +304,12 @@ class _SignupFlowPageState extends State<SignupFlowPage> {
     void flipGoalPreserveDiffAndRefreshControllers(
         void Function(void Function()) setLocal) {
       final diffAbs = (targetWeightKg - weightKg).abs();
+      final minDiff = 1.0; // Minimum 1 kg difference
+      
       if (goal == 'gain') {
-        targetWeightKg = weightKg + diffAbs;
+        targetWeightKg = weightKg + (diffAbs < minDiff ? minDiff : diffAbs);
       } else if (goal == 'lose') {
-        targetWeightKg = weightKg - diffAbs;
+        targetWeightKg = weightKg - (diffAbs < minDiff ? minDiff : diffAbs);
       } else {
         targetWeightKg = weightKg;
       }
@@ -330,57 +345,77 @@ class _SignupFlowPageState extends State<SignupFlowPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Step 2 of 3',
-                    style: TextStyle(fontWeight: FontWeight.w600)),
+                const Text(
+                  'Tell us about yourself',
+                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                ),
                 const SizedBox(height: 8),
+                const Text(
+                  'Step 2 of 3',
+                  style: TextStyle(fontSize: 14, color: Colors.grey),
+                ),
+                const SizedBox(height: 24),
 
-                // Units
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text('Units'),
-                    SegmentedButton<String>(
-                      segments: const [
-                        ButtonSegment(value: 'metric', label: Text('Metric')),
-                        ButtonSegment(value: 'imperial', label: Text('Imperial')),
+                // Units Card
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Units', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                        SegmentedButton<String>(
+                          segments: const [
+                            ButtonSegment(value: 'metric', label: Text('Metric')),
+                            ButtonSegment(value: 'imperial', label: Text('Imperial')),
+                          ],
+                          selected: {units},
+                          onSelectionChanged: (s) => switchUnits(s.first),
+                        ),
                       ],
-                      selected: {units},
-                      onSelectionChanged: (s) => switchUnits(s.first),
                     ),
-                  ],
+                  ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
 
-                // Sex & Age
-                Row(
-                  children: [
-                    Expanded(
-                      child: DropdownButtonFormField<String>(
-                        value: sex,
-                        decoration: const InputDecoration(labelText: 'Sex'),
-                        items: const [
-                          DropdownMenuItem(value: 'male', child: Text('Male')),
-                          DropdownMenuItem(value: 'female', child: Text('Female')),
-                        ],
-                        onChanged: (v) => setLocal(() => sex = v ?? 'male'),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: TextFormField(
-                        initialValue: age.toString(),
-                        decoration:
-                            const InputDecoration(labelText: 'Age (years)'),
-                        keyboardType: TextInputType.number,
-                        onChanged: (v) {
-                          final n = int.tryParse(v);
-                          if (n != null) setLocal(() => age = n.clamp(10, 100));
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
+                // Basic Info Card
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Basic Information', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: DropdownButtonFormField<String>(
+                                value: sex,
+                                decoration: const InputDecoration(labelText: 'Sex'),
+                                items: const [
+                                  DropdownMenuItem(value: 'male', child: Text('Male')),
+                                  DropdownMenuItem(value: 'female', child: Text('Female')),
+                                ],
+                                onChanged: (v) => setLocal(() => sex = v ?? 'male'),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: TextFormField(
+                                initialValue: age.toString(),
+                                decoration:
+                                    const InputDecoration(labelText: 'Age (years)'),
+                                keyboardType: TextInputType.number,
+                                onChanged: (v) {
+                                  final n = int.tryParse(v);
+                                  if (n != null) setLocal(() => age = n.clamp(10, 100));
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
 
                 // Height
                 if (units == 'metric')
@@ -443,9 +478,9 @@ class _SignupFlowPageState extends State<SignupFlowPage> {
                     }
                   },
                 ),
-                const SizedBox(height: 12),
+                        const SizedBox(height: 16),
 
-                // Activity
+                // Activity level
                 DropdownButtonFormField<String>(
                   value: activity,
                   decoration: const InputDecoration(labelText: 'Activity level'),
@@ -458,16 +493,40 @@ class _SignupFlowPageState extends State<SignupFlowPage> {
                   ],
                   onChanged: (v) => setLocal(() => activity = v ?? 'moderate'),
                 ),
-                const SizedBox(height: 12),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
 
-                // Goal (flip preserves diff)
+                // Goals Card
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Your Goal', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 16),
+
+                // Goal (dynamic label based on weight difference)
                 DropdownButtonFormField<String>(
                   value: goal,
                   decoration: const InputDecoration(labelText: 'Goal'),
-                  items: const [
-                    DropdownMenuItem(value: 'lose', child: Text('Lose weight')),
-                    DropdownMenuItem(value: 'maintain', child: Text('Maintain')),
-                    DropdownMenuItem(value: 'gain', child: Text('Gain weight')),
+                  items: [
+                    DropdownMenuItem(
+                      value: 'lose',
+                      child: Text(goal == 'lose' 
+                          ? 'Lose ${kgToDisplay(weightKg - targetWeightKg).toStringAsFixed(1)} ${units == 'metric' ? 'kg' : 'lb'}'
+                          : 'Lose weight'),
+                    ),
+                    const DropdownMenuItem(value: 'maintain', child: Text('Maintain weight')),
+                    DropdownMenuItem(
+                      value: 'gain',
+                      child: Text(goal == 'gain'
+                          ? 'Gain ${kgToDisplay(targetWeightKg - weightKg).toStringAsFixed(1)} ${units == 'metric' ? 'kg' : 'lb'}'
+                          : 'Gain weight'),
+                    ),
                   ],
                   onChanged: (v) {
                     if (v == null || v == goal) return;
@@ -514,7 +573,11 @@ class _SignupFlowPageState extends State<SignupFlowPage> {
                     setLocal(() {});
                   },
                 ),
-                const SizedBox(height: 16),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 32),
 
                 // Nav
                 Row(
@@ -592,20 +655,45 @@ class _SignupFlowPageState extends State<SignupFlowPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Step 3 of 3',
-              style: TextStyle(fontWeight: FontWeight.w600)),
+          const Text(
+            'Review your profile',
+            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+          ),
           const SizedBox(height: 8),
+          const Text(
+            'Step 3 of 3',
+            style: TextStyle(fontSize: 14, color: Colors.grey),
+          ),
+          const SizedBox(height: 24),
+          
+          // Account Card
           Card(
             child: Padding(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _kv('Account',
-                      FirebaseAuth.instance.currentUser?.email ?? 'Google Account'),
+                  const Text('Account', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 12),
+                  _kv('Email', FirebaseAuth.instance.currentUser?.email ?? 'Google Account'),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          
+          // Profile Card
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Profile', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 12),
                   _kv('Units', isMetric ? 'Metric' : 'Imperial'),
                   _kv('Sex', _sex.name),
-                  _kv('Age', '$_age'),
+                  _kv('Age', '$_age years'),
                   _kv(
                     'Height',
                     isMetric
@@ -619,14 +707,29 @@ class _SignupFlowPageState extends State<SignupFlowPage> {
                         : '${(_weightKg * 2.2046226218).toStringAsFixed(1)} lb',
                   ),
                   _kv('Activity', _activityToString(_activity)),
-                  _kv('Goal', _goalToString(_goal)),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          
+          // Goals Card
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Goals', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 12),
+                  _kv('Goal', _goalToString(_goal).capitalize()),
                   _kv(
                     'Target weight',
                     isMetric
                         ? '${_targetWeightKg.toStringAsFixed(1)} kg'
                         : '${(_targetWeightKg * 2.2046226218).toStringAsFixed(1)} lb',
                   ),
-                  _kv('Speed', _rateLabel()),
+                  _kv('Rate', _rateLabel()),
                 ],
               ),
             ),
@@ -708,5 +811,12 @@ class _SignupFlowPageState extends State<SignupFlowPage> {
         ],
       ),
     );
+  }
+}
+
+extension StringExtension on String {
+  String capitalize() {
+    if (isEmpty) return this;
+    return "${this[0].toUpperCase()}${substring(1)}";
   }
 }
