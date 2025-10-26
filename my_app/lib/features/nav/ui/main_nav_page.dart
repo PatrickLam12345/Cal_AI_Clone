@@ -38,24 +38,20 @@ class _MainNavPageState extends State<MainNavPage> {
 
   Future<void> _onAnalyzeMeal(BuildContext context) async {
     final picker = ImagePicker();
-    final shot = await picker.pickImage(source: ImageSource.camera);
-    if (shot == null) return;
+    
+    // Loop to allow multiple retakes
+    while (true) {
+      final shot = await picker.pickImage(source: ImageSource.camera);
+      if (shot == null) return;
 
-    final result = await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => MealAnalysisPage(photo: File(shot.path)),
-      ),
-    );
-
-// If the review screen asks for a retake, open camera again
-    if (result == 'retake') {
-      final shot2 = await picker.pickImage(source: ImageSource.camera);
-      if (shot2 == null) return;
-      await Navigator.of(context).push(
+      final result = await Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (_) => MealAnalysisPage(photo: File(shot2.path)),
+          builder: (_) => MealAnalysisPage(photo: File(shot.path)),
         ),
       );
+
+      // If user doesn't want to retake, exit loop
+      if (result != 'retake') break;
     }
   }
 

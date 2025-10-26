@@ -171,7 +171,7 @@ class _HomePageState extends State<HomePage> {
                                 children: [
                                   Text('${totalCalories.toStringAsFixed(0)}',
                                       style: const TextStyle(
-                                          fontSize: 20,
+                                          fontSize: 18,
                                           fontWeight: FontWeight.bold,
                                           color: Colors.orange)),
                                   const Text('kcal',
@@ -184,7 +184,7 @@ class _HomePageState extends State<HomePage> {
                                 children: [
                                   Text('${totalProtein.toStringAsFixed(0)}g',
                                       style: const TextStyle(
-                                          fontSize: 16,
+                                          fontSize: 18,
                                           fontWeight: FontWeight.bold,
                                           color: Colors.blue)),
                                   const Text('protein',
@@ -197,7 +197,7 @@ class _HomePageState extends State<HomePage> {
                                 children: [
                                   Text('${totalCarbs.toStringAsFixed(0)}g',
                                       style: const TextStyle(
-                                          fontSize: 16,
+                                          fontSize: 18,
                                           fontWeight: FontWeight.bold,
                                           color: Colors.green)),
                                   const Text('carbs',
@@ -210,7 +210,7 @@ class _HomePageState extends State<HomePage> {
                                 children: [
                                   Text('${totalFat.toStringAsFixed(0)}g',
                                       style: const TextStyle(
-                                          fontSize: 16,
+                                          fontSize: 18,
                                           fontWeight: FontWeight.bold,
                                           color: Colors.red)),
                                   const Text('fat',
@@ -231,6 +231,7 @@ class _HomePageState extends State<HomePage> {
                           onTap: () {
                             final d = meal.data();
                             final ingredients = (d['ingredients'] as List?)?.whereType<Map<String, dynamic>>().toList() ?? const [];
+                            final imageUrl = d['image_url'] as String?;
                             showModalBottomSheet(
                               context: context,
                               isScrollControlled: true,
@@ -241,6 +242,35 @@ class _HomePageState extends State<HomePage> {
                                   child: ListView(
                                     controller: controller,
                                     children: [
+                                      // Show image if it exists
+                                      if (imageUrl != null) ...[
+                                        ClipRRect(
+                                          borderRadius: BorderRadius.circular(12),
+                                          child: ConstrainedBox(
+                                            constraints: const BoxConstraints(
+                                              maxHeight: 300,
+                                            ),
+                                            child: Image.network(
+                                              imageUrl,
+                                              width: double.infinity,
+                                              fit: BoxFit.contain,
+                                              errorBuilder: (context, error, stackTrace) {
+                                                return Container(
+                                                  height: 200,
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.grey[300],
+                                                    borderRadius: BorderRadius.circular(12),
+                                                  ),
+                                                  child: const Center(
+                                                    child: Icon(Icons.broken_image, size: 48, color: Colors.grey),
+                                                  ),
+                                                );
+                                              },
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 16),
+                                      ],
                                       Text(d['name'] as String? ?? 'Meal', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
                                       const SizedBox(height: 12),
                                       // Totals row (always shown)
@@ -248,42 +278,86 @@ class _HomePageState extends State<HomePage> {
                                         children: [
                                           Text(
                                             '${(((d['kcal'] as num?)?.toDouble() ?? 0)).toStringAsFixed(0)} kcal',
-                                            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.orange),
+                                            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.orange, fontSize: 13),
                                           ),
-                                          const SizedBox(width: 12),
+                                          const SizedBox(width: 8),
                                           Text('P: ${(((d['protein_g'] as num?)?.toDouble() ?? 0)).toStringAsFixed(0)}g',
-                                              style: const TextStyle(fontSize: 11, color: Colors.blue)),
-                                          const SizedBox(width: 6),
+                                              style: const TextStyle(fontSize: 13, color: Colors.blue)),
+                                          const SizedBox(width: 8),
                                           Text('C: ${(((d['carb_g'] as num?)?.toDouble() ?? 0)).toStringAsFixed(0)}g',
-                                              style: const TextStyle(fontSize: 11, color: Colors.green)),
-                                          const SizedBox(width: 6),
+                                              style: const TextStyle(fontSize: 13, color: Colors.green)),
+                                          const SizedBox(width: 8),
                                           Text('F: ${(((d['fat_g'] as num?)?.toDouble() ?? 0)).toStringAsFixed(0)}g',
-                                              style: const TextStyle(fontSize: 11, color: Colors.red)),
+                                              style: const TextStyle(fontSize: 13, color: Colors.red)),
                                         ],
                                       ),
                                       const SizedBox(height: 12),
                                       if (ingredients.length <= 1)
                                         const SizedBox.shrink()
-                                      else
+                                      else ...[
+                                        const Divider(),
+                                        const SizedBox(height: 8),
+                                        const Text('Ingredients', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                                        const SizedBox(height: 8),
                                         ...ingredients.map((ing) {
-                                        final n = ing['name']?.toString() ?? 'Ingredient';
-        
-                                        final g = (ing['portion_grams'] as num?)?.toDouble();
-                                        final p = (ing['protein'] as num?)?.toDouble() ?? 0;
-                                        final c = (ing['carbs'] as num?)?.toDouble() ?? 0;
-                                        final f = (ing['fat'] as num?)?.toDouble() ?? 0;
-                                        final k = (ing['calories'] as num?)?.toDouble() ?? 0;
-                                        return ListTile(
-                                          title: Text(n),
-                                          subtitle: Text([
-                                            if (g != null) '${g.toStringAsFixed(0)} g',
-                                            'P ${p.toStringAsFixed(0)}g',
-                                            'C ${c.toStringAsFixed(0)}g',
-                                            'F ${f.toStringAsFixed(0)}g',
-                                          ].join(' · ')),
-                                          trailing: Text('${k.toStringAsFixed(0)} kcal'),
-                                        );
+                                          final n = ing['name']?.toString() ?? 'Ingredient';
+                                          final g = (ing['portion_grams'] as num?)?.toDouble();
+                                          final p = (ing['protein'] as num?)?.toDouble() ?? 0;
+                                          final c = (ing['carbs'] as num?)?.toDouble() ?? 0;
+                                          final f = (ing['fat'] as num?)?.toDouble() ?? 0;
+                                          final k = (ing['calories'] as num?)?.toDouble() ?? 0;
+                                          
+                                          return Container(
+                                            margin: const EdgeInsets.only(bottom: 12),
+                                            padding: const EdgeInsets.all(12),
+                                            decoration: BoxDecoration(
+                                              color: Theme.of(context).brightness == Brightness.dark
+                                                  ? Colors.grey[850]
+                                                  : Colors.grey[100],
+                                              borderRadius: BorderRadius.circular(8),
+                                            ),
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Row(
+                                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                  children: [
+                                                    Expanded(
+                                                      child: Text(
+                                                        n,
+                                                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                                                      ),
+                                                    ),
+                                                    if (g != null)
+                                                      Text(
+                                                        '${g.toStringAsFixed(0)}g',
+                                                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                                                      ),
+                                                  ],
+                                                ),
+                                                const SizedBox(height: 8),
+                                                Row(
+                                                  children: [
+                                                    Text(
+                                                      '${k.toStringAsFixed(0)} kcal',
+                                                      style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.orange, fontSize: 13),
+                                                    ),
+                                                    const SizedBox(width: 8),
+                                                    Text('P: ${p.toStringAsFixed(0)}g',
+                                                        style: const TextStyle(fontSize: 13, color: Colors.blue)),
+                                                    const SizedBox(width: 8),
+                                                    Text('C: ${c.toStringAsFixed(0)}g',
+                                                        style: const TextStyle(fontSize: 13, color: Colors.green)),
+                                                    const SizedBox(width: 8),
+                                                    Text('F: ${f.toStringAsFixed(0)}g',
+                                                        style: const TextStyle(fontSize: 13, color: Colors.red)),
+                                                  ],
+                                                ),
+                                              ],
+                                            ),
+                                          );
                                         }),
+                                      ],
                                     ],
                                   ),
                                 ),
@@ -343,7 +417,7 @@ class _HomePageState extends State<HomePage> {
                           return Icon(
                             source == 'scan' ? Icons.camera_alt : Icons.search,
                             color: Colors.grey[400],
-                            size: 24,
+                            size: 48,
                           );
                         },
                         loadingBuilder: (context, child, loadingProgress) {
@@ -367,7 +441,7 @@ class _HomePageState extends State<HomePage> {
                     )
                   : Icon(
                       source == 'scan' ? Icons.camera_alt : Icons.search,
-                      size: 24,
+                      size: 48,
                       color: source == 'scan' ? Colors.green : Colors.blue,
                     ),
             ),
@@ -399,17 +473,17 @@ class _HomePageState extends State<HomePage> {
                       Text(
                         '${calories.toStringAsFixed(0)} kcal',
                         style: const TextStyle(
-                            fontWeight: FontWeight.bold, color: Colors.orange),
+                            fontWeight: FontWeight.bold, color: Colors.orange, fontSize: 13),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 8),
                       Text('P: ${protein.toStringAsFixed(0)}g',
-                          style: const TextStyle(fontSize: 11, color: Colors.blue)),
-                      const SizedBox(width: 6),
+                          style: const TextStyle(fontSize: 13, color: Colors.blue)),
+                      const SizedBox(width: 8),
                       Text('C: ${carbs.toStringAsFixed(0)}g',
-                          style: const TextStyle(fontSize: 11, color: Colors.green)),
-                      const SizedBox(width: 6),
+                          style: const TextStyle(fontSize: 13, color: Colors.green)),
+                      const SizedBox(width: 8),
                       Text('F: ${fat.toStringAsFixed(0)}g',
-                          style: const TextStyle(fontSize: 11, color: Colors.red)),
+                          style: const TextStyle(fontSize: 13, color: Colors.red)),
                     ],
                   ),
                 ],
@@ -520,9 +594,10 @@ class _HomePageState extends State<HomePage> {
 
   Widget _buildProgressItem(
       String label, double consumed, double target, String unit, Color color) {
-    final percentage = target > 0 ? (consumed / target).clamp(0.0, 1.0) : 0.0;
+    final percentage = target > 0 ? (consumed / target).clamp(0.0, 1.0) : 0.0; // For progress bar (capped at 100%)
+    final displayPercentage = target > 0 ? (consumed / target) * 100 : 0.0; // For text display (actual percentage)
     final remaining = (target - consumed).clamp(0.0, double.infinity);
-    final isOverTarget = consumed > target;
+    final isOverTarget = consumed > (target * 1.15); // Only red when 15% or more over
 
     return Column(
       children: [
@@ -530,52 +605,84 @@ class _HomePageState extends State<HomePage> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
-        RichText(
-          text: TextSpan(
-            style: TextStyle(
-              color: Theme.of(context)
-                  .colorScheme
-                  .onSurface
-                  .withOpacity(0.85),
-            ),
-            children: [
-              TextSpan(
-                text: '${consumed.toStringAsFixed(0)}',
+            RichText(
+              text: TextSpan(
                 style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: isOverTarget ? Colors.red : color,
+                  color: Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withOpacity(0.85),
                 ),
+                children: [
+                  TextSpan(
+                    text: '${consumed.toStringAsFixed(0)}',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: isOverTarget ? Colors.red : color,
+                    ),
+                  ),
+                  TextSpan(
+                    text: ' / ${target.toStringAsFixed(0)} $unit',
+                  ),
+                ],
               ),
-              TextSpan(
-                text: ' / ${target.toStringAsFixed(0)} $unit',
-              ),
-            ],
-          ),
-        ),
+            ),
           ],
         ),
         const SizedBox(height: 8),
-        LinearProgressIndicator(
-          value: percentage,
-          backgroundColor: Colors.grey[300],
-          valueColor: AlwaysStoppedAnimation<Color>(
-            isOverTarget ? Colors.red : color,
-          ),
-          minHeight: 8,
+        // Custom gradient progress bar
+        LayoutBuilder(
+          builder: (context, constraints) {
+            return ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: Stack(
+                children: [
+                  // Background
+                  Container(
+                    height: 8,
+                    width: constraints.maxWidth,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                    ),
+                  ),
+                  // Gradient progress (gradient spans full width, but container is clipped)
+                  ClipRect(
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      widthFactor: percentage,
+                      child: Container(
+                        height: 8,
+                        width: constraints.maxWidth,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: isOverTarget 
+                                ? [Colors.red.shade400, Colors.red.shade700]
+                                : [color.withOpacity(0.6), color],
+                            begin: Alignment.centerLeft,
+                            end: Alignment.centerRight,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
         ),
         const SizedBox(height: 4),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              '${(percentage * 100).toStringAsFixed(0)}%',
+              '${displayPercentage.toStringAsFixed(0)}%',
               style: TextStyle(
                 fontSize: 12,
                 color: isOverTarget ? Colors.red : Colors.grey[600],
               ),
             ),
             Text(
-              isOverTarget
+              consumed > target
                   ? '+${(consumed - target).toStringAsFixed(0)} $unit over'
                   : '${remaining.toStringAsFixed(0)} $unit remaining',
               style: TextStyle(

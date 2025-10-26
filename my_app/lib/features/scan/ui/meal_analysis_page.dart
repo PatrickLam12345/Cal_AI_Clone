@@ -58,6 +58,11 @@ class _MealAnalysisPageState extends State<MealAnalysisPage> {
     }
   }
 
+  Future<void> _retakePhoto() async {
+    if (!mounted) return;
+    Navigator.of(context).pop('retake');
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -67,9 +72,9 @@ class _MealAnalysisPageState extends State<MealAnalysisPage> {
         title: const Text('Meal Analysis'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loading ? null : _analyzeMeal,
-            tooltip: 'Re-analyze',
+            icon: const Icon(Icons.camera_alt),
+            onPressed: _loading ? null : _retakePhoto,
+            tooltip: 'Retake Photo',
           ),
         ],
       ),
@@ -99,9 +104,10 @@ class _MealAnalysisPageState extends State<MealAnalysisPage> {
                         const SizedBox(height: 8),
                         Text(_error!, textAlign: TextAlign.center),
                         const SizedBox(height: 16),
-                        ElevatedButton(
-                          onPressed: _analyzeMeal,
-                          child: const Text('Try Again'),
+                        ElevatedButton.icon(
+                          onPressed: _retakePhoto,
+                          icon: const Icon(Icons.camera_alt),
+                          label: const Text('Take New Photo'),
                         ),
                       ],
                     ),
@@ -192,12 +198,21 @@ class _MealAnalysisPageState extends State<MealAnalysisPage> {
     final analysis = _mealAnalysis!;
     
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 100), // Extra bottom padding for FAB
       children: [
         // Photo
         ClipRRect(
           borderRadius: BorderRadius.circular(12),
-          child: Image.file(_photo),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              maxHeight: 300,
+            ),
+            child: Image.file(
+              _photo,
+              width: double.infinity,
+              fit: BoxFit.contain,
+            ),
+          ),
         ),
         const SizedBox(height: 16),
 
@@ -268,124 +283,69 @@ class _MealAnalysisPageState extends State<MealAnalysisPage> {
   }
 
   Widget _buildIngredientCard(IngredientNutrition ingredient, ThemeData theme) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ExpansionTile(
-        title: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    ingredient.name,
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  Text(
-                    ingredient.portionDesc,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                ],
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: theme.brightness == Brightness.dark
+            ? Colors.grey[850]
+            : Colors.grey[100],
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
+                  ingredient.name,
+                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                ),
               ),
-            ),
-            Text(
-              '${ingredient.calories.toStringAsFixed(0)} kcal',
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
-                color: Colors.orange,
+              Text(
+                '${ingredient.portionGrams.toStringAsFixed(0)}g',
+                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Text(
+                '${ingredient.calories.toStringAsFixed(0)} kcal',
+                style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.orange, fontSize: 13),
+              ),
+              const SizedBox(width: 8),
+              Text('P: ${ingredient.protein.toStringAsFixed(0)}g',
+                  style: const TextStyle(fontSize: 13, color: Colors.blue)),
+              const SizedBox(width: 8),
+              Text('C: ${ingredient.carbs.toStringAsFixed(0)}g',
+                  style: const TextStyle(fontSize: 13, color: Colors.green)),
+              const SizedBox(width: 8),
+              Text('F: ${ingredient.fat.toStringAsFixed(0)}g',
+                  style: const TextStyle(fontSize: 13, color: Colors.red)),
+            ],
+          ),
+          if (ingredient.usdaName != null) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.green[50],
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: Colors.green[200]!),
+              ),
+              child: Text(
+                'USDA: ${ingredient.usdaName}',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.green[700],
+                ),
               ),
             ),
           ],
-        ),
-        subtitle: Text('${ingredient.portionGrams.toStringAsFixed(0)}g'),
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            child: Column(
-              children: [
-                const Divider(),
-                const SizedBox(height: 8),
-                                 Row(
-                   children: [
-                     Expanded(
-                       child: _MicroNutritionTile(
-                         label: 'Protein',
-                         value: ingredient.protein,
-                         unit: 'g',
-                         color: Colors.blue,
-                       ),
-                     ),
-                     Expanded(
-                       child: _MicroNutritionTile(
-                         label: 'Carbs',
-                         value: ingredient.carbs,
-                         unit: 'g',
-                         color: Colors.green,
-                       ),
-                     ),
-                     Expanded(
-                       child: _MicroNutritionTile(
-                         label: 'Fat',
-                         value: ingredient.fat,
-                         unit: 'g',
-                         color: Colors.red,
-                       ),
-                     ),
-                   ],
-                 ),
-                 const SizedBox(height: 8),
-                 Row(
-                   children: [
-                     Expanded(
-                       child: _MicroNutritionTile(
-                         label: 'Fiber',
-                         value: ingredient.fiber,
-                         unit: 'g',
-                         color: Colors.brown,
-                       ),
-                     ),
-                     Expanded(
-                       child: _MicroNutritionTile(
-                         label: 'Sugar',
-                         value: ingredient.sugar,
-                         unit: 'g',
-                         color: Colors.pink,
-                       ),
-                     ),
-                     Expanded(
-                       child: _MicroNutritionTile(
-                         label: 'Sodium',
-                         value: ingredient.sodium,
-                         unit: 'mg',
-                         color: Colors.purple,
-                       ),
-                     ),
-                   ],
-                 ),
-                if (ingredient.usdaName != null) ...[
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.green[50],
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: Colors.green[200]!),
-                    ),
-                    child: Text(
-                      'USDA: ${ingredient.usdaName}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.green[700],
-                      ),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
         ],
       ),
     );
@@ -440,44 +400,3 @@ class _NutritionTile extends StatelessWidget {
   }
 }
 
-class _MicroNutritionTile extends StatelessWidget {
-  final String label;
-  final double value;
-  final String unit;
-  final Color color;
-
-  const _MicroNutritionTile({
-    required this.label,
-    required this.value,
-    required this.unit,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-      child: Column(
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 10,
-              color: color,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            '${value.toStringAsFixed(1)} $unit',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: color,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
